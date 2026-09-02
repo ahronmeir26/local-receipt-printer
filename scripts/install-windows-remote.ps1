@@ -3,7 +3,8 @@ param(
   [string]$ArchivePath,
   [string]$NodeVersion = '22.22.2',
   [string]$WinSWVersion = '2.12.0',
-  [string]$ReportUrl = 'http://192.168.5.118:8765/report'
+  [string]$ReportUrl = 'http://192.168.5.118:8765/report',
+  [switch]$SkipTestPrint
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,7 +89,11 @@ try {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
   }
   New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
-  Expand-Archive -LiteralPath $resolvedArchive -DestinationPath $temporaryRoot -Force
+  $tarPath = Join-Path $env:WINDIR 'System32\tar.exe'
+  if (-not (Test-Path -LiteralPath $tarPath)) {
+    throw 'Windows built-in tar.exe is required to extract the deployment archive.'
+  }
+  Invoke-Checked $tarPath @('-xf', $resolvedArchive, '-C', $temporaryRoot)
 
   $packageFile = Get-ChildItem -Path $temporaryRoot -Filter package.json -Recurse -File |
     Where-Object { Test-Path -LiteralPath (Join-Path $_.Directory.FullName 'src\server.js') } |
@@ -247,20 +252,23 @@ try {
   if (-not $status.selectedPrinter) { throw "The service is healthy but did not select a printer: $($status.selectionReason)" }
   if ($status.selectedPrinter.isOffline) { throw "The selected printer is offline: $($status.selectedPrinter.name)" }
 
-  Write-Step 'Printing a physical USB verification receipt'
-  $testBody = @{
-    text = "LOCAL RECEIPT PRINTER`nUSB connection verified`n$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))`n"
-    copies = 1
-    cut = $true
-    openDrawer = $false
-  } | ConvertTo-Json
-  $testResult = Invoke-RestMethod `
-    -Uri 'http://127.0.0.1:17890/api/print' `
-    -Method Post `
-    -ContentType 'application/json' `
-    -Body $testBody `
-    -TimeoutSec 90
-  if ($testResult.job.status -ne 'accepted-by-spooler') { throw 'The verification receipt was not accepted by the Windows spooler.' }
+  $testResult = $null
+  if (-not $SkipTestPrint) {
+    Write-Step 'Printing a physical USB verification receipt'
+    $testBody = @{
+      text = "LOCAL RECEIPT PRINTER`nUSB connection verified`n$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))`n"
+      copies = 1
+      cut = $true
+      openDrawer = $false
+    } | ConvertTo-Json
+    $testResult = Invoke-RestMethod `
+      -Uri 'http://127.0.0.1:17890/api/print' `
+      -Method Post `
+      -ContentType 'application/json' `
+      -Body $testBody `
+      -TimeoutSec 90
+    if ($testResult.job.status -ne 'accepted-by-spooler') { throw 'The verification receipt was not accepted by the Windows spooler.' }
+  }
 
   Write-Host ''
   Write-Host 'Local Receipt Printer installation completed.' -ForegroundColor Green
@@ -269,13 +277,17 @@ try {
   Write-Host "Windows service: LocalReceiptPrinter"
   Write-Host "Selected printer: $($status.selectedPrinter.name)"
   Write-Host 'Website: http://127.0.0.1:17890'
-  Write-Host 'A USB verification receipt was submitted. Confirm that paper physically printed.'
+  if ($testResult) {
+    Write-Host 'A USB verification receipt was submitted. Confirm that paper physically printed.'
+  } else {
+    Write-Host 'Physical test printing was intentionally skipped.'
+  }
   $installReport.success = $true
   $installReport.completedAt = [DateTime]::Now.ToString('o')
   $installReport.releasePath = $releasePath
   $installReport.service = 'LocalReceiptPrinter'
   $installReport.printer = $status.selectedPrinter
-  $installReport.testJob = $testResult.job
+  if ($testResult) { $installReport.testJob = $testResult.job }
 } catch {
   $installReport.step = $currentStep
   $installReport.error = $_.Exception.Message

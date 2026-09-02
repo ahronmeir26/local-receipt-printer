@@ -8,10 +8,12 @@ const { applyCorsHeaders, handlePreflight, originIsAllowed } = require('./cors')
 const { textReceipt } = require('./escpos');
 const logger = require('./logger');
 const { PrinterManager } = require('./printer-manager');
+const { WindowsKioskController } = require('./windows-kiosk');
 const packageJson = require('../package.json');
 
 const config = loadConfig();
 const manager = new PrinterManager(config);
+const kioskController = new WindowsKioskController();
 const publicDirectory = path.join(__dirname, '..', 'public');
 const MAX_REQUEST_BYTES = 3 * 1024 * 1024;
 const startedAt = Date.now();
@@ -113,6 +115,17 @@ async function handleApi(request, response, pathname) {
     manager.setPrinter(body.printerName || null);
     const updated = await manager.discover();
     return sendJson(response, 200, { ok: true, ...updated });
+  }
+
+  if (request.method === 'POST' && pathname === '/api/windows/kiosk-exit') {
+    const body = await readJson(request);
+    if (!body || body.action !== 'exit-kiosk' || Object.keys(body).length !== 1) {
+      throw Object.assign(new Error('action must be exactly "exit-kiosk".'), { statusCode: 400 });
+    }
+    logger.warn('Windows kiosk exit requested');
+    const result = await kioskController.exitKiosk();
+    logger.warn('Windows kiosk exit completed', result);
+    return sendJson(response, 202, { ok: true, ...result });
   }
 
   if (request.method === 'POST' && pathname === '/api/print') {

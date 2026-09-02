@@ -118,6 +118,23 @@ curl -X POST http://127.0.0.1:17890/api/print/raw \
 - `GET /api/health` — process liveness without touching the print system
 - `POST /api/config` with `{"printerName":"installed printer name"}` — persist a printer
 
+### Exit Windows kiosk mode
+
+On the installed Windows service only, the trusted Glass Pane kiosk can request
+an exit from Assigned Access:
+
+```sh
+curl -X POST http://127.0.0.1:17890/api/windows/kiosk-exit \
+  -H "Content-Type: application/json" \
+  -d '{"action":"exit-kiosk"}'
+```
+
+The installer builds a small protected Windows helper that signs out the active
+console session using the Windows Terminal Services API. This reaches the
+Windows sign-in screen without granting software permission to synthesize the
+machine-wide Secure Attention Sequence. Requests are exact-origin protected,
+limited to one every five seconds, logged, and never retried automatically.
+
 Requests are processed one at a time. A failed spool attempt triggers fresh USB queue discovery and up to five bounded attempts over roughly 22 seconds. The response succeeds only after the Windows spooler accepts the job. Unaccepted jobs are not persisted or replayed after a restart. The API only binds to `127.0.0.1` by default and rejects browser requests from non-local origins.
 
 ## Settings and logs

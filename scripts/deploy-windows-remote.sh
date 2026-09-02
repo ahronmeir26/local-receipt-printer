@@ -1,16 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ $# -ne 1 || "$1" == -* || "$1" =~ [[:space:]] ]]; then
-  echo "Usage: $0 WINDOWS_USER@WINDOWS_IP" >&2
+if [[ $# -lt 1 || $# -gt 2 || "$1" == -* || "$1" =~ [[:space:]] || ( $# -eq 2 && "$2" != "--skip-test-print" ) ]]; then
+  echo "Usage: $0 WINDOWS_USER@WINDOWS_IP [--skip-test-print]" >&2
   exit 2
 fi
 
 remote_target="$1"
+skip_test_print="${2:-}"
 script_directory="$(cd "$(dirname "$0")" && pwd)"
 project_directory="$(cd "$script_directory/.." && pwd)"
 temporary_directory="$(mktemp -d)"
-archive_path="$temporary_directory/local-receipt-printer-deploy.zip"
+archive_path="$temporary_directory/local-receipt-printer-deploy.tar.gz"
 control_socket="$temporary_directory/ssh-control"
 
 cleanup() {
@@ -20,7 +21,11 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Packaging Local Receipt Printer..."
-ditto -c -k --keepParent --norsrc "$project_directory" "$archive_path"
+tar -czf "$archive_path" \
+  --exclude='.git' \
+  --exclude='.DS_Store' \
+  -C "$(dirname "$project_directory")" \
+  "$(basename "$project_directory")"
 
 echo "Connecting to $remote_target (the Windows account password may be requested once)..."
 ssh -o ControlMaster=yes -o ControlPath="$control_socket" -o ControlPersist=120 -N -f "$remote_target"
@@ -32,8 +37,13 @@ scp -o ControlPath="$control_socket" \
   "$remote_target:"
 
 echo "Running the Windows installer..."
-ssh -t -o ControlPath="$control_socket" "$remote_target" \
-  'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File install-windows-remote.ps1 -ArchivePath local-receipt-printer-deploy.zip'
+if [[ "$skip_test_print" == "--skip-test-print" ]]; then
+  ssh -t -o ControlPath="$control_socket" "$remote_target" \
+    'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File install-windows-remote.ps1 -ArchivePath local-receipt-printer-deploy.tar.gz -SkipTestPrint'
+else
+  ssh -t -o ControlPath="$control_socket" "$remote_target" \
+    'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File install-windows-remote.ps1 -ArchivePath local-receipt-printer-deploy.tar.gz'
+fi
 
 echo
 echo "Remote installation finished."

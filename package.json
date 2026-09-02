@@ -1,6 +1,6 @@
 {
   "name": "local-receipt-printer",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "description": "Reliable localhost print bridge for an Epson TM-m30III USB receipt printer",
   "main": "src/server.js",
@@ -11,7 +11,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "check": "node --check src/server.js && node --check src/cors.js && node --check src/printer-manager.js && node --check src/platform-printers.js && node --check public/app.js && node --check scripts/service.js",
+    "check": "node --check src/server.js && node --check src/cors.js && node --check src/printer-manager.js && node --check src/platform-printers.js && node --check src/windows-kiosk.js && node --check public/app.js && node --check scripts/service.js",
     "install-service": "node scripts/service.js install",
     "uninstall-service": "node scripts/service.js uninstall"
   },
