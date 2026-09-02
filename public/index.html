@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Receipt Printer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">USB PRINT BRIDGE</p>
+        <h1>Local Receipt Printer</h1>
+        <p class="lede">Send text or ESC/POS jobs to the receipt printer connected to this computer.</p>
+      </div>
+      <div id="service-status" class="status waiting"><span></span> Checking…</div>
+    </header>
+
+    <section class="card settings">
+      <div>
+        <h2>Printer</h2>
+        <p id="printer-detail" class="muted">Looking for installed printers…</p>
+      </div>
+      <div class="printer-controls">
+        <label for="printer">Selected printer</label>
+        <div class="control-row">
+          <select id="printer" disabled><option>Loading…</option></select>
+          <button id="save-printer" class="secondary" disabled>Save</button>
+          <button id="refresh" class="secondary">Refresh</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card composer">
+      <label for="receipt"><h2>Receipt text</h2></label>
+      <textarea id="receipt" spellcheck="false" placeholder="Thank you!&#10;&#10;Order #1234&#10;Total: $12.34"></textarea>
+      <div class="options">
+        <label>Copies <input id="copies" type="number" min="1" max="10" value="1"></label>
+        <label class="checkbox"><input id="cut" type="checkbox" checked> Cut paper</label>
+        <label class="checkbox"><input id="drawer" type="checkbox"> Open cash drawer</label>
+      </div>
+      <button id="print" class="primary">Print receipt</button>
+      <p id="message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card api-help">
+      <h2>Send from another local app</h2>
+      <pre><code>curl -X POST http://127.0.0.1:17890/api/print \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Hello from my app!\\n","cut":true}'</code></pre>
+      <p class="muted">The service only listens on this computer. Raw ESC/POS is also available at <code>/api/print/raw</code>.</p>
+    </section>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>
